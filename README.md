@@ -11,7 +11,6 @@ Veriler Firebase Realtime Database'de saklanır; giriş Firebase Authentication 
 - **Yazdır / PDF**: seçili öğrenci veya tüm öğrenciler (her biri ayrı A4 sayfa) PDF olarak kaydedilebilir.
 
 ## Kurulum (bir kez)
-Bu proje, foto galeri ile aynı Firebase projesini (`enesogrenci-91325`) kullanır; veriler `sinavTakip/` yolunda tutulur ve galeri verisine dokunmaz.
 
 1. **Authentication**: Firebase Console → Authentication → Sign-in method → *E-posta/Şifre*'yi etkinleştirin. Users sekmesinden giriş yapacak kullanıcıyı ekleyin.
 2. **Veritabanı kuralları**: Realtime Database → Rules. Mevcut kurallarınızı **silmeyin**; sadece `rules` içine `database.rules.json` dosyasındaki `sinavTakip` bloğunu ekleyin:
@@ -21,8 +20,7 @@ Bu proje, foto galeri ile aynı Firebase projesini (`enesogrenci-91325`) kullan�
    Böylece öğrenci sonuçlarını yalnızca giriş yapmış kullanıcılar okuyup yazabilir.
 3. **Çalıştırma**: ES modülleri kullanıldığı için dosyayı çift tıklayarak (`file://`) açmayın; bir sunucudan açın:
    ```bash
-   python -m http.server 8080
-   # http://localhost:8080
+
    ```
    Yayına alırken (Firebase Hosting vb.) alan adını Authentication → Settings → Authorized domains'e ekleyin (`localhost` varsayılan olarak ekli).
 
