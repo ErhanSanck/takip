@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sınav Takip · Eon Kurs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Başlatma / hata göstergesi: JavaScript yüklenemezse beyaz ekran yerine sebep görünür -->
+  <div id="boot" style="max-width:560px;margin:15vh auto;padding:20px;font:15px/1.5 system-ui,sans-serif;color:#1f3a5f;text-align:center">Yükleniyor…</div>
+  <noscript><p style="text-align:center;font:15px system-ui">Bu sayfa için JavaScript gerekli.</p></noscript>
+  <script>
+    (function () {
+      function fail(msg) {
+        var b = document.getElementById("boot"); if (!b) return;
+        b.style.cssText = "max-width:600px;margin:12vh auto;padding:20px;font:15px/1.55 system-ui,sans-serif;color:#7a1f18;background:#fff3f2;border:1px solid #f0c4c0;border-radius:10px";
+        b.innerHTML = "<b>Sayfa başlatılamadı.</b><br>" + msg +
+          "<br><br><small style='color:#555'>Şu dosyaların hepsi aynı yerde (repo kökünde) olmalı: <code>index.html</code>, <code>style.css</code>, <code>app.js</code>, <code>db.js</code>, <code>parser.js</code>, <code>firebase-config.js</code>. index.html repo kökünde olmalı.</small>";
+      }
+      window.addEventListener("error", function (e) {
+        var t = e.target;
+        if (t && t !== window && (t.tagName === "SCRIPT" || t.tagName === "LINK")) fail("Dosya yüklenemedi: <code>" + (t.src || t.href) + "</code>");
+        else if (e.message) fail("Hata: " + e.message);
+      }, true);
+      window.addEventListener("unhandledrejection", function (e) { fail("Hata: " + ((e.reason && e.reason.message) || e.reason)); });
+    })();
+  </script>
+  <!-- Giriş -->
+  <section id="loginView" class="login" hidden>
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <div class="brand big"><span class="brand-mark">E</span> Sınav Takip</div>
+      <p class="muted">Öğrenci sınav sonuçlarına erişmek için giriş yapın.</p>
+      <label>E-posta<input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>Şifre<input id="loginPass" type="password" autocomplete="current-password" required></label>
+      <p id="loginError" class="error" role="alert"></p>
+      <button class="btn primary" type="submit">Giriş yap</button>
+    </form>
+  </section>
+
+  <!-- Uygulama -->
+  <div id="appView" hidden>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">E</span> Sınav Takip <span id="demoBadge" class="badge" hidden>Deneme modu</span></div>
+      <div class="topbar-actions">
+        <button id="btnAddPdf" class="btn primary">PDF Ekle</button>
+        <button id="btnExams" class="btn">Sınavlar</button>
+        <button id="btnPrint" class="btn">Yazdır / PDF</button>
+        <button id="btnLogout" class="btn ghost">Çıkış</button>
+      </div>
+      <input id="pdfInput" type="file" accept="application/pdf,.pdf" multiple hidden>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <input id="search" class="search" type="search" placeholder="Öğrenci ara…" aria-label="Öğrenci ara">
+        <nav id="studentList" class="student-list"></nav>
+      </aside>
+      <main id="detail" class="detail"></main>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="modalRoot"></div>
+  <div id="printRoot" aria-hidden="true"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
