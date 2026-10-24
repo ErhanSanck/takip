@@ -1,5 +1,5 @@
 import { createBackend } from "./db.js";
-import { parseExamPdf, normalizeName } from "./parser.js";
+import { parseExamPdf, normalizeName, uyarilar, taniMetni, PARSER_VERSION } from "./parser.js?v=2026-10-24-v4";
 
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
 const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -229,7 +229,8 @@ async function handleFiles(files) {
       const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
       const parsed = await parseExamPdf(pdf);
       if (!parsed.satirlar.length) {
-        toast(`"${file.name}" içinde öğrenci satırı bulunamadı. Eon Kurs TYT puan sıralı liste PDF'i bekleniyor.`, 6000);
+        toast("", 1);
+        openDiag(parsed, file.name);
         continue;
       }
       toast("", 1);
@@ -239,6 +240,27 @@ async function handleFiles(files) {
       toast(`"${file.name}" okunamadı: ${err.message || err}`, 6000);
     }
   }
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast("Tanı bilgisi kopyalandı."); return; } catch { /* eski tarayıcı */ }
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); toast("Tanı bilgisi kopyalandı."); } catch { toast("Kopyalanamadı; metni elle seçip kopyalayın.", 5000); }
+  ta.remove();
+}
+
+function openDiag(parsed, fileName) {
+  const txt = taniMetni(parsed, fileName);
+  const m = openModal({
+    title: "PDF'ten öğrenci satırı okunamadı",
+    body: `<p>Bu dosyada beklenen Eon Kurs "TYT puan sıralı liste" düzeni bulunamadı. Doğru PDF'i seçtiğinizden emin olun. Sorun sürerse aşağıdaki tanı bilgisini kopyalayıp gönderin.</p>
+           <pre class="diag">${esc(txt)}</pre>`,
+    footer: `<button class="btn" id="dgCopy">Tanı bilgisini kopyala</button><button class="btn primary" id="dgClose">Kapat</button>`,
+  });
+  $("#dgCopy", m.el).addEventListener("click", () => copyText(txt));
+  $("#dgClose", m.el).addEventListener("click", m.close);
 }
 
 function buildPreview(parsed, fileName) {
@@ -258,6 +280,7 @@ function buildPreview(parsed, fileName) {
 function reviewImport(p) {
   return new Promise((resolve) => {
     const { parsed, matched, fresh, missing } = p;
+    const uyar = uyarilar(parsed);
     const exists = (id) => !!state.sinavlar?.[id];
     const miniRow = ({ r }) => `<tr><td>${esc(trTitle(r.ad))}</td><td>${esc(r.sube)}</td><td>${fmt(r.dersler.turkce?.[2] ?? 0)}</td><td>${fmt(r.dersler.mat?.[2] ?? 0)}</td><td>${fmt(r.dersler.geo?.[2] ?? 0)}</td><td>${fmt(r.net)}</td><td>${fmt(r.puan)}</td></tr>`;
     const miniTable = (rows) => `<table class="mini"><thead><tr><th>Öğrenci</th><th>Şube</th><th>Türkçe</th><th>Mat.</th><th>Geo.</th><th>TYT net</th><th>Puan</th></tr></thead><tbody>${rows.map(miniRow).join("")}</tbody></table>`;
@@ -267,6 +290,8 @@ function reviewImport(p) {
         <label>Sınav tarihi<input type="date" id="impTarih" value="${isoFromTr(parsed.tarih) || new Date().toISOString().slice(0, 10)}"></label>
       </div>
       <div id="impWarn"></div>
+      ${uyar.length ? `<div class="warnbox"><b>Dikkat:</b><ul class="list-plain">${uyar.map((u) => `<li>${esc(u)}</li>`).join("")}</ul></div>` : ""}
+      <details class="sec"><summary>Tanı bilgisi · ayrıştırıcı ${esc(PARSER_VERSION)}</summary><div class="inner"><pre class="diag">${esc(taniMetni(parsed, p.fileName))}</pre><button class="btn" id="impCopy">Kopyala</button></div></details>
       <div class="chips">
         <span class="chip ok">${matched.length} öğrenci listeyle eşleşti</span>
         ${fresh.length ? `<span class="chip warn">${fresh.length} öğrenci listede yok</span>` : ""}
@@ -279,6 +304,7 @@ function reviewImport(p) {
       ${missing.length ? `<details class="sec"><summary>Bu PDF'de bulunamayan öğrenciler (${missing.length})</summary><div class="inner"><ul class="list-plain">${missing.map((o) => `<li>${esc(trTitle(o.ad))} <span class="muted">· ${esc(o.sube || "")}</span></li>`).join("")}</ul><p class="note">Bu öğrenciler sınava katılmadı olarak gösterilir.</p></div></details>` : ""}`;
     const m = openModal({ title: `PDF önizleme · ${p.fileName}`, dismissable: false, body, footer: `<button class="btn" id="impCancel">Vazgeç</button><button class="btn primary" id="impOk">Listeye ekle</button>` });
     const $m = (s) => $(s, m.el);
+    $m("#impCopy")?.addEventListener("click", () => copyText(taniMetni(parsed, p.fileName)));
 
     const examId = () => `${$m("#impTarih").value}-${slug($m("#impAd").value).slice(0, 40)}`;
     const refreshWarn = () => {
@@ -294,6 +320,7 @@ function reviewImport(p) {
     $m("#impOk").addEventListener("click", async () => {
       const ad = $m("#impAd").value.trim(), iso = $m("#impTarih").value;
       if (!ad || !iso) { toast("Sınav adı ve tarihi gerekli."); return; }
+      if (uyar.length && !confirm("Önizlemede uyarılar var; veriler yanlış okunmuş olabilir. Yine de eklensin mi?")) return;
       const picked = [...m.el.querySelectorAll(".impNew")].filter((c) => c.checked).map((c) => fresh[+c.dataset.i]);
       const targets = [...matched, ...picked];
       if (!targets.length) { toast("Eklenecek öğrenci yok."); return; }

@@ -128,3 +128,5 @@ table.mini { width: 100%; border-collapse: collapse; font-variant-numeric: tabul
   .results thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .results tbody tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+.diag { margin: 0 0 8px; padding: 10px 12px; background: #f6f8fb; border: 1px solid var(--line); border-radius: 8px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; user-select: text; max-height: 240px; overflow: auto; }
