@@ -51,15 +51,23 @@ function findHeaderCols(words) {
   for (const arr of byY.values()) if (arr.length >= 10 && (!best || arr.length > best.length)) best = arr;
   if (!best) return null;
   best.sort((a, b) => a.x - b.x);
-  return { cols: best.slice(0, 10).map((w) => w.x), toplamX: best[10] ? best[10].x : null, headerY: best[0].y };
+  const headerY = best[0].y;
+  // Son "D" TOPLAM sütunudur; öncekiler ders sütunlarıdır.
+  const cols = best.slice(0, -1).map((w) => w.x);
+  const toplamX = best[best.length - 1].x;
+  // Bazı sınavlarda "SEÇ. FELSEFE" (seçmeli felsefe) ek sütunu bulunur: FELSEFE ile DİN'den sonra, MATEMATİK'ten önce.
+  const hasSecFelsefe = words.some((w) => /^SEÇ\.?$/.test(w.s) && Math.abs(w.y - headerY) < 40);
+  const names = hasSecFelsefe ? [...DERSLER.slice(0, 5), "secfelsefe", ...DERSLER.slice(5)] : DERSLER;
+  if (names.length !== cols.length) return null; // tanınmayan düzen: yanlış okumak yerine atla
+  return { cols, toplamX, headerY, names };
 }
 
 function parsePage(words) {
   const hdr = findHeaderCols(words);
-  if (!hdr) return [];
-  const { cols, toplamX, headerY } = hdr;
+  if (!hdr) return { rows: [], names: null };
+  const { cols, toplamX, headerY, names } = hdr;
   const firstSubjectX = cols[0] - 6;
-  const toplamStart = (toplamX ?? cols[9] + 30) - 6;
+  const toplamStart = toplamX - 6;
   // sıra numarası: x küçük, tam sayı, başlığın altında
   const anchors = words.filter((w) => w.x < firstSubjectX - 130 && isInt(w.s) && w.y < headerY - 3);
   const rows = [];
@@ -79,8 +87,8 @@ function parsePage(words) {
       const [D, Y, N] = [toks[i], toks[i + 1], toks[i + 2]];
       if (!isInt(D.s) || !isInt(Y.s) || !isNet(N.s)) { ok = false; break; }
       let c = 0;
-      for (let j = 1; j < 10; j++) if (Math.abs(cols[j] - D.x) < Math.abs(cols[c] - D.x)) c = j;
-      dersler[DERSLER[c]] = [parseInt(D.s, 10), parseInt(Y.s, 10), toNum(N.s)];
+      for (let j = 1; j < cols.length; j++) if (Math.abs(cols[j] - D.x) < Math.abs(cols[c] - D.x)) c = j;
+      dersler[names[c]] = [parseInt(D.s, 10), parseInt(Y.s, 10), toNum(N.s)];
     }
     if (!ok || !ad) continue;
     const net = Math.round(Object.values(dersler).reduce((s, v) => s + v[2], 0) * 100) / 100;
@@ -97,7 +105,7 @@ function parsePage(words) {
     const [genel, kurum, subesira, sinif] = after.slice(0, 4).map(toNum);
     rows.push({ ad, sube, dersler, net, puan, genel, kurum, subesira, sinif });
   }
-  return rows;
+  return { rows, names: hdr.names };
 }
 
 export async function parseExamPdf(pdf) {
@@ -115,18 +123,20 @@ export async function parseExamPdf(pdf) {
       result.baslik = (b ? b[1] : m ? m[1] : "").trim();
       if (t) result.tarih = t[1];
     }
-    if (!result.ortalamalar) {
-      const a = text.match(/((?:-?\d+,\d{2}\s+){11})(\d+)\s+(\d+)\s+(\d+)/);
+    const page_ = parsePage(words);
+    if (!result.ortalamalar && page_.names) {
+      const n = page_.names.length + 1; // dersler + TYT net
+      const a = text.match(new RegExp("((?:-?\\d+,\\d{2}\\s+){" + n + "})(\\d+)\\s+(\\d+)\\s+(\\d+)"));
       if (a) {
         const v = a[1].trim().split(/\s+/).map(toNum);
-        result.ortalamalar = Object.fromEntries(DERSLER.map((d, i) => [d, v[i]]));
-        result.ortalamalar.net = v[10];
+        result.ortalamalar = Object.fromEntries(page_.names.map((d, i) => [d, v[i]]));
+        result.ortalamalar.net = v[n - 1];
         result.genelKatilim = parseInt(a[2], 10);
         result.kurumKatilim = parseInt(a[3], 10);
         result.subeKatilim = parseInt(a[4], 10);
       }
     }
-    for (const r of parsePage(words)) {
+    for (const r of page_.rows) {
       const k = normalizeName(r.ad);
       if (seen.has(k)) continue; // puan sıralı ve isim sıralı listede aynı satır: ilki geçerli
       seen.add(k);
